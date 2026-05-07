@@ -5,6 +5,7 @@ import type { FixedPointKind, Vec2, Wall } from '@galley/shared'
 import { useProjectStore } from '../../store'
 import { api } from '../../lib/api'
 import { mmToPx } from '../../lib/coords'
+import { withToast } from '../../lib/withToast'
 import { ScaleTool } from './ScaleTool'
 import { WallTraceTool, type WallTraceHandle } from './WallTraceTool'
 import {
@@ -58,9 +59,16 @@ export function BlueprintEditor() {
     if (!file || !project) return
     setUploading(true)
     try {
-      const dims = await readImageDims(file)
-      const next = await api.uploadBlueprint(project.id, file, dims.width, dims.height)
+      const dims = await withToast(readImageDims(file), {
+        errorMessage: 'Could not read the selected image',
+      })
+      const next = await withToast(
+        api.uploadBlueprint(project.id, file, dims.width, dims.height),
+        { errorMessage: 'Failed to upload blueprint', trackInFlight: true },
+      )
       setLocal(next)
+    } catch {
+      // withToast already pushed an error toast; nothing more to do here.
     } finally {
       setUploading(false)
     }

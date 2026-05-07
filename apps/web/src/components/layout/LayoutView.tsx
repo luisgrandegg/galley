@@ -3,9 +3,11 @@ import { Stage, Layer, Line, Rect, Text, Group } from 'react-konva'
 import type Konva from 'konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import { useProjectStore } from '../../store'
+import { useToastStore } from '../../store/toasts'
 import { api } from '../../lib/api'
 import { mmToPx, pxToMm } from '../../lib/coords'
 import { snapModule, type SnapBox } from '../../lib/snap'
+import { withToast } from '../../lib/withToast'
 import {
   STANDARD_MODULES,
   validateLayout,
@@ -66,8 +68,6 @@ export function LayoutView() {
   const project = useProjectStore((s) => s.project)
   const setLocal = useProjectStore((s) => s.setLocal)
   const [busy, setBusy] = useState(false)
-  const [warning, setWarning] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [swapMenu, setSwapMenu] = useState<SwapMenu>(null)
   const stageRef = useRef<Konva.Stage | null>(null)
@@ -90,11 +90,15 @@ export function LayoutView() {
       if (!project) return
       if (persistTimer.current) clearTimeout(persistTimer.current)
       persistTimer.current = setTimeout(() => {
-        api
-          .saveLayout(project.id, layout)
-          .then((next) => setLocal(next))
-          .catch((err) => {
-            setError(err instanceof Error ? err.message : String(err))
+        // The post-save setLocal acknowledges an already-applied optimistic
+        // update — pass `snapshot: false` so it doesn't add a duplicate entry
+        // to the undo stack on top of the one updateModules already pushed.
+        withToast(api.saveLayout(project.id, layout), {
+          errorMessage: 'Failed to save layout changes',
+        })
+          .then((next) => setLocal(next, { snapshot: false }))
+          .catch(() => {
+            // Toast already shown by withToast.
           })
       }, 250)
     },
@@ -167,15 +171,18 @@ export function LayoutView() {
   async function generate() {
     if (!project) return
     setBusy(true)
-    setError(null)
-    setWarning(null)
     try {
-      const result = await api.generateLayout(project.id)
+      const result = await withToast(api.generateLayout(project.id), {
+        errorMessage: 'Failed to generate layout',
+        trackInFlight: true,
+      })
       setLocal({ ...project, layout: result.layout })
       setSelectedId(null)
-      setWarning(result.warning)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (result.warning) {
+        useToastStore.getState().push('warning', result.warning)
+      }
+    } catch {
+      // Toast already shown by withToast.
     } finally {
       setBusy(false)
     }
@@ -377,8 +384,6 @@ export function LayoutView() {
               Need: scale set, walls traced, and Q&A finished before generating.
             </p>
           )}
-          {warning && <p className="text-sm text-amber-700">{warning}</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
         </section>
 
         <section className="space-y-2">
