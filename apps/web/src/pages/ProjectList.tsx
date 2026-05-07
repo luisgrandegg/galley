@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api, type ProjectSummary } from '../lib/api'
+import { withToast } from '../lib/withToast'
+import { useToastStore } from '../store/toasts'
 
 export function ProjectList() {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     void refresh()
@@ -13,9 +14,11 @@ export function ProjectList() {
 
   async function refresh() {
     try {
-      setProjects(await api.listProjects())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setProjects(
+        await withToast(api.listProjects(), { errorMessage: 'Failed to load projects' }),
+      )
+    } catch {
+      // toast already pushed by withToast — swallow so refresh is fire-and-forget.
     }
   }
 
@@ -23,12 +26,13 @@ export function ProjectList() {
     e.preventDefault()
     if (!name.trim()) return
     setBusy(true)
-    setError(null)
     try {
-      const project = await api.createProject(name.trim())
+      const project = await withToast(api.createProject(name.trim()), {
+        errorMessage: 'Failed to create project',
+      })
       window.location.hash = `#/projects/${project.id}`
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+    } catch {
+      // toast already pushed.
     } finally {
       setBusy(false)
     }
@@ -36,8 +40,13 @@ export function ProjectList() {
 
   async function remove(id: string) {
     if (!confirm('Delete this project?')) return
-    await api.deleteProject(id)
-    void refresh()
+    try {
+      await withToast(api.deleteProject(id), { errorMessage: 'Failed to delete project' })
+      useToastStore.getState().push('success', 'Project deleted')
+      void refresh()
+    } catch {
+      // toast already pushed.
+    }
   }
 
   return (
@@ -62,11 +71,9 @@ export function ProjectList() {
           type="submit"
           disabled={busy || !name.trim()}
         >
-          Create
+          {busy ? 'Creating…' : 'Create'}
         </button>
       </form>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {projects.length === 0 ? (
         <p className="text-sm text-stone-500">No projects yet.</p>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useProjectStore } from '../../store'
 import { api } from '../../lib/api'
+import { withToast } from '../../lib/withToast'
 import type { Preferences } from '@galley/shared'
 
 type Turn =
@@ -17,19 +18,19 @@ export function QAWizard() {
   const [partial, setPartial] = useState<Partial<Preferences>>({})
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   if (!project) return null
 
   async function nextTurn(answer?: string) {
     if (!project) return
     setBusy(true)
-    setError(null)
     try {
       const nextHistory: ChatMessage[] = answer
         ? [...history, { role: 'user', content: answer }]
         : history
-      const turn = await api.qaNext(project.id, partial, nextHistory)
+      const turn = await withToast(api.qaNext(project.id, partial, nextHistory), {
+        errorMessage: 'Q&A turn failed',
+      })
       setHistory(
         turn.kind === 'question'
           ? [...nextHistory, { role: 'assistant', content: turn.text }]
@@ -39,8 +40,8 @@ export function QAWizard() {
       if (turn.kind === 'final') {
         setLocal({ ...project, preferences: turn.preferences })
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+    } catch {
+      // toast already pushed by withToast.
     } finally {
       setBusy(false)
     }
@@ -115,7 +116,7 @@ export function QAWizard() {
               type="submit"
               disabled={busy || !input.trim()}
             >
-              Send
+              {busy ? 'Sending…' : 'Send'}
             </button>
           </form>
         )}
@@ -125,8 +126,6 @@ export function QAWizard() {
             Preferences captured. Switch to the Layout tab to generate.
           </div>
         )}
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
       <aside className="rounded border border-line bg-white p-4">
