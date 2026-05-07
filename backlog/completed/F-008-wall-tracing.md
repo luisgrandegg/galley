@@ -31,7 +31,7 @@ angle increments by default; hold Shift to free-rotate.
 ## Completion
 
 - **Completed:** 2026-05-07
-- **PR:** #TBD — feat: wall tracing tool and fixed-point placement (F-008, F-010)
+- **PR:** [#2](https://github.com/luisgrandegg/galley/pull/2) — feat: wall tracing tool and fixed-point placement (F-008, F-010)
 - **Commit:** 8e808cf223ad86d71b3c91b3f77a97c1514f222a
 - **Notes:** WallTraceTool is presentational + imperative (ref) so the editor
   owns the Stage and dispatches click/dblclick. Vertices are stored in mm
