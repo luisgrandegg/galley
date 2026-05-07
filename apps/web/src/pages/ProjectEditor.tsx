@@ -7,15 +7,16 @@ import { LayoutView } from '../components/layout/LayoutView'
 type Tab = 'editor' | 'qa' | 'layout'
 
 export function ProjectEditor({ id }: { id: string }) {
-  const { project, loading, error, load } = useProjectStore()
+  const { project, loading, load } = useProjectStore()
   const [tab, setTab] = useState<Tab>('editor')
 
   useEffect(() => {
     void load(id)
   }, [id, load])
 
+  // Load failures surface as toasts via the project store; the editor itself
+  // simply waits for `project` to materialise.
   if (loading) return <p className="text-sm text-stone-500">Loading…</p>
-  if (error) return <p className="text-sm text-red-600">{error}</p>
   if (!project) return null
 
   return (

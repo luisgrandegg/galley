@@ -15,5 +15,4 @@ Active features for galley. Check this before starting work.
 | F-011 | Q&A wizard UI (chat-style with quick picks) | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-012 | Layout view + Generate button | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-015 | Undo/redo in-session stack | Planned | — |
-| F-016 | Loading states and error toasts | Planned | — |
 | F-017 | Keyboard shortcuts panel | Planned | — |
