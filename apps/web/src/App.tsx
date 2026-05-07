@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ProjectList } from './pages/ProjectList'
 import { ProjectEditor } from './pages/ProjectEditor'
+import { ShortcutsPanel } from './components/ShortcutsPanel'
+import { useShortcutsPanel } from './store/shortcutsPanel'
+import { isEditableTarget } from './lib/keyboard'
 import { GlobalProgressBar, ToastContainer } from './components/Toast'
 
 function parseRoute(): { kind: 'list' } | { kind: 'project'; id: string } {
@@ -11,12 +14,28 @@ function parseRoute(): { kind: 'list' } | { kind: 'project'; id: string } {
 
 export function App() {
   const [route, setRoute] = useState(parseRoute)
+  const openShortcuts = useShortcutsPanel((s) => s.open)
 
   useEffect(() => {
     const onHash = () => setRoute(parseRoute())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (isEditableTarget(event.target)) return
+      // `?` is Shift+/ on most layouts. Match either the literal '?' or
+      // shift-slash to be safe across keyboards.
+      if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+        if (event.metaKey || event.ctrlKey || event.altKey) return
+        event.preventDefault()
+        openShortcuts()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openShortcuts])
 
   return (
     <div className="min-h-full">
@@ -32,6 +51,7 @@ export function App() {
       <main className="mx-auto max-w-6xl px-6 py-8">
         {route.kind === 'list' ? <ProjectList /> : <ProjectEditor id={route.id} />}
       </main>
+      <ShortcutsPanel />
       <ToastContainer />
     </div>
   )
