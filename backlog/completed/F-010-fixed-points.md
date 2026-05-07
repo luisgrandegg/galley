@@ -24,3 +24,16 @@ gas inlet, electrical outlets, doors (with swing direction), windows.
 ## Out of scope
 
 - Editing properties after placement (other than position drag). Defer.
+
+---
+
+## Completion
+
+- **Completed:** 2026-05-07
+- **PR:** #TBD — feat: wall tracing tool and fixed-point placement (F-008, F-010)
+- **Commit:** 8e808cf223ad86d71b3c91b3f77a97c1514f222a
+- **Notes:** FixedPointTool ships one toolbar button per `FixedPointKind`
+  with a consistent palette. Doors and windows use `window.prompt` for
+  width and (for doors) swing — acceptable per MVP scope. Markers are
+  draggable while the editor is idle and persist on dragend through
+  `useProjectStore.patch`.
