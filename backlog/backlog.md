@@ -11,9 +11,7 @@ Active features for galley. Check this before starting work.
 | F-005 | Anthropic layout generation + repair loop | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-006 | Project list + create UI | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-007 | Blueprint editor: image upload + Konva background | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
-| F-008 | Wall tracing tool (click-to-place, snap to angle) | Planned | — |
 | F-009 | Scale-setting tool (two-point reference + mm input) | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
-| F-010 | Fixed-point placement tool | Planned | — |
 | F-011 | Q&A wizard UI (chat-style with quick picks) | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-012 | Layout view + Generate button | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-013 | Module drag/rotate/swap/delete + snap helpers | Planned | — |
