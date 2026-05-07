@@ -1,0 +1,5 @@
+#!/bin/sh
+# Tracked pre-commit hooks — activated via `git config core.hooksPath githooks`
+# This is set automatically by the `prepare` script in package.json on `pnpm install`.
+
+node scripts/check-backlog-consistency.js
