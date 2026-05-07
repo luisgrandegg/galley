@@ -254,7 +254,12 @@ describe('checkWalkwayClearance', () => {
       baseInput({
         modules: [
           mkModule({ id: 'top', kind: 'base_cabinet', position: { x: 1000, y: 0 } }),
-          mkModule({ id: 'bot', kind: 'base_cabinet', position: { x: 1000, y: 1500 } }),
+          mkModule({
+            id: 'bot',
+            kind: 'base_cabinet',
+            position: { x: 1000, y: 1600 },
+            rotation: 180,
+          }),
         ],
       })
     )
@@ -266,12 +271,29 @@ describe('checkWalkwayClearance', () => {
       baseInput({
         modules: [
           mkModule({ id: 'top', kind: 'base_cabinet', position: { x: 1000, y: 0 } }),
-          mkModule({ id: 'bot', kind: 'base_cabinet', position: { x: 1000, y: 1200 } }),
+          mkModule({
+            id: 'bot',
+            kind: 'base_cabinet',
+            position: { x: 1000, y: 1200 },
+            rotation: 180,
+          }),
         ],
       })
     )
     expect(v).toHaveLength(1)
     expect(v[0]!.kind).toBe('walkway_clearance')
+  })
+
+  it('does not flag side-by-side modules on the same wall (same orientation)', () => {
+    const v = checkWalkwayClearance(
+      baseInput({
+        modules: [
+          mkModule({ id: 'a', kind: 'base_cabinet', position: { x: 0, y: 0 } }),
+          mkModule({ id: 'b', kind: 'base_cabinet', position: { x: 700, y: 0 } }),
+        ],
+      })
+    )
+    expect(v).toHaveLength(0)
   })
 })
 
@@ -295,15 +317,16 @@ describe('checkWorkTriangle', () => {
   }
 
   it('passes for a healthy triangle', () => {
-    // Place across two opposing walls so legs are within range.
+    // All three appliances along the top wall, evenly spaced — legs of 1200 mm
+    // each, perimeter 2400 mm. Comfortably within the WORK_TRIANGLE limits.
     const input = baseInput({
       modules: [
-        mkModule({ id: 's', kind: 'sink_unit', position: { x: 200, y: 0 } }),
-        mkModule({ id: 'h', kind: 'hob_unit', position: { x: 1700, y: 0 } }),
+        mkModule({ id: 's', kind: 'sink_unit', position: { x: 300, y: 0 } }),
+        mkModule({ id: 'h', kind: 'hob_unit', position: { x: 1500, y: 0 } }),
         mkModule({
           id: 'f',
           kind: 'fridge',
-          position: { x: 200, y: 2350 },
+          position: { x: 2700, y: 0 },
           width: 600,
           depth: 650,
         }),
@@ -376,12 +399,14 @@ describe('checkApplianceFrontClearance', () => {
 
 describe('validateLayout (end-to-end)', () => {
   it('returns ok: true when every check passes', () => {
+    // Sink, hob, fridge all along the top wall — backed against the wall, near
+    // their service points, no opposing parallel runs, no doors.
     const input = baseInput({
       fixedPoints: [
         { id: 'w', kind: 'water', position: { x: 600, y: 100 } },
         { id: 'd', kind: 'drain', position: { x: 700, y: 100 } },
-        { id: 'e1', kind: 'electric', position: { x: 1700, y: 100 } },
-        { id: 'e2', kind: 'electric', position: { x: 200, y: 2400 } },
+        { id: 'e1', kind: 'electric', position: { x: 1800, y: 100 } },
+        { id: 'e2', kind: 'electric', position: { x: 3000, y: 100 } },
       ],
       modules: [
         mkModule({ id: 's', kind: 'sink_unit', position: { x: 300, y: 0 } }),
@@ -389,7 +414,7 @@ describe('validateLayout (end-to-end)', () => {
         mkModule({
           id: 'f',
           kind: 'fridge',
-          position: { x: 200, y: 2350 },
+          position: { x: 2700, y: 0 },
           width: 600,
           depth: 650,
         }),

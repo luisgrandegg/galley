@@ -181,7 +181,7 @@ export async function generateLayout(input: GenerateLayoutInput): Promise<Genera
     if (iteration === MAX_REPAIRS) break
 
     messages.push(
-      { role: 'assistant', content: response.content as Anthropic.ContentBlockParam[] },
+      { role: 'assistant', content: response.content },
       {
         role: 'user',
         content: [

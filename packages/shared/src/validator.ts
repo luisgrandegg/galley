@@ -51,8 +51,17 @@ export function checkContainment(input: ValidatorInput): Violation[] {
   const out: Violation[] = []
   for (const m of input.modules) {
     const r = moduleFootprint(m)
-    const corners = rectCorners(r)
-    const allInside = corners.every((c) => pointInWalls(c, input.walls))
+    // Test points 1 mm inside each corner. Modules backed flush against a wall
+    // have a corner exactly on the boundary; ray-casting is ambiguous on the
+    // boundary so we shrink slightly to land in the interior unambiguously.
+    const inset = 1
+    const probes = [
+      { x: r.x + inset, y: r.y + inset },
+      { x: r.x + r.w - inset, y: r.y + inset },
+      { x: r.x + r.w - inset, y: r.y + r.h - inset },
+      { x: r.x + inset, y: r.y + r.h - inset },
+    ]
+    const allInside = probes.every((c) => pointInWalls(c, input.walls))
     if (!allInside) {
       out.push({
         kind: 'containment',
@@ -195,6 +204,17 @@ export function checkDoorSwingClear(input: ValidatorInput): Violation[] {
 
 // 6. Walkway clearance ──────────────────────────────────────────────────────
 
+/**
+ * Two cabinet runs that face each other across a gap need ≥ CLEARANCES.walkway mm
+ * between them. We only flag pairs whose fronts actually point at each other
+ * (per rotation) — modules sitting side-by-side on the same wall share an
+ * orientation and don't form a walkway.
+ *
+ *   rotation 0   → front faces +y
+ *   rotation 90  → front faces -x
+ *   rotation 180 → front faces -y
+ *   rotation 270 → front faces +x
+ */
 export function checkWalkwayClearance(input: ValidatorInput): Violation[] {
   const out: Violation[] = []
   const rects = input.modules
@@ -205,19 +225,8 @@ export function checkWalkwayClearance(input: ValidatorInput): Violation[] {
     for (let j = i + 1; j < rects.length; j++) {
       const a = rects[i]!
       const b = rects[j]!
-      // Two rectangles "face" each other if they overlap on one axis and are
-      // separated on the other. Measure the gap on the separation axis.
-      const overlapX = a.r.x < b.r.x + b.r.w && b.r.x < a.r.x + a.r.w
-      const overlapY = a.r.y < b.r.y + b.r.h && b.r.y < a.r.y + a.r.h
-      let gap = Infinity
-      if (overlapX && !overlapY) {
-        gap = a.r.y < b.r.y ? b.r.y - (a.r.y + a.r.h) : a.r.y - (b.r.y + b.r.h)
-      } else if (overlapY && !overlapX) {
-        gap = a.r.x < b.r.x ? b.r.x - (a.r.x + a.r.w) : a.r.x - (b.r.x + b.r.w)
-      } else {
-        continue
-      }
-      if (gap >= 0 && gap < CLEARANCES.walkway) {
+      const gap = facingGap(a, b)
+      if (gap !== null && gap >= 0 && gap < CLEARANCES.walkway) {
         out.push({
           kind: 'walkway_clearance',
           message: `Walkway between ${labelOf(a.m)} (${a.m.id}) and ${labelOf(b.m)} (${b.m.id}) is ${Math.round(gap)} mm — must be at least ${CLEARANCES.walkway} mm.`,
@@ -227,6 +236,31 @@ export function checkWalkwayClearance(input: ValidatorInput): Violation[] {
     }
   }
   return out
+}
+
+function facingGap(
+  a: { m: Module; r: { x: number; y: number; w: number; h: number } },
+  b: { m: Module; r: { x: number; y: number; w: number; h: number } }
+): number | null {
+  // a above b, a faces +y (down) and b faces -y (up): walkway is vertical.
+  if (a.r.y + a.r.h <= b.r.y && a.m.rotation === 0 && b.m.rotation === 180) {
+    if (overlap1D(a.r.x, a.r.w, b.r.x, b.r.w)) return b.r.y - (a.r.y + a.r.h)
+  }
+  if (b.r.y + b.r.h <= a.r.y && b.m.rotation === 0 && a.m.rotation === 180) {
+    if (overlap1D(a.r.x, a.r.w, b.r.x, b.r.w)) return a.r.y - (b.r.y + b.r.h)
+  }
+  // a left of b, a faces +x (right) and b faces -x (left): walkway is horizontal.
+  if (a.r.x + a.r.w <= b.r.x && a.m.rotation === 270 && b.m.rotation === 90) {
+    if (overlap1D(a.r.y, a.r.h, b.r.y, b.r.h)) return b.r.x - (a.r.x + a.r.w)
+  }
+  if (b.r.x + b.r.w <= a.r.x && b.m.rotation === 270 && a.m.rotation === 90) {
+    if (overlap1D(a.r.y, a.r.h, b.r.y, b.r.h)) return a.r.x - (b.r.x + b.r.w)
+  }
+  return null
+}
+
+function overlap1D(a: number, aLen: number, b: number, bLen: number): boolean {
+  return a < b + bLen && b < a + aLen
 }
 
 // 7. Work triangle ──────────────────────────────────────────────────────────
