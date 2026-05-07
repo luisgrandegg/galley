@@ -19,5 +19,4 @@ Active features for galley. Check this before starting work.
 | F-013 | Module drag/rotate/swap/delete + snap helpers | Planned | — |
 | F-014 | PNG and JSON export | Planned | — |
 | F-015 | Undo/redo in-session stack | Planned | — |
-| F-016 | Loading states and error toasts | Planned | — |
 | F-017 | Keyboard shortcuts panel | Planned | — |
