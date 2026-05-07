@@ -11,7 +11,6 @@ type Tab = 'editor' | 'qa' | 'layout'
 export function ProjectEditor({ id }: { id: string }) {
   const project = useProjectStore((s) => s.project)
   const loading = useProjectStore((s) => s.loading)
-  const error = useProjectStore((s) => s.error)
   const load = useProjectStore((s) => s.load)
   const undo = useProjectStore((s) => s.undo)
   const redo = useProjectStore((s) => s.redo)
@@ -47,8 +46,9 @@ export function ProjectEditor({ id }: { id: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo])
 
+  // Load failures surface as toasts via the project store; the editor itself
+  // simply waits for `project` to materialise.
   if (loading) return <p className="text-sm text-stone-500">Loading…</p>
-  if (error) return <p className="text-sm text-red-600">{error}</p>
   if (!project) return null
 
   return (

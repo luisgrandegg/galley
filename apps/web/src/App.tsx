@@ -4,6 +4,7 @@ import { ProjectEditor } from './pages/ProjectEditor'
 import { ShortcutsPanel } from './components/ShortcutsPanel'
 import { useShortcutsPanel } from './store/shortcutsPanel'
 import { isEditableTarget } from './lib/keyboard'
+import { GlobalProgressBar, ToastContainer } from './components/Toast'
 
 function parseRoute(): { kind: 'list' } | { kind: 'project'; id: string } {
   const hash = window.location.hash.slice(1)
@@ -38,6 +39,7 @@ export function App() {
 
   return (
     <div className="min-h-full">
+      <GlobalProgressBar />
       <header className="border-b border-line bg-white">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
           <a href="#/" className="font-semibold tracking-tight">
@@ -50,6 +52,7 @@ export function App() {
         {route.kind === 'list' ? <ProjectList /> : <ProjectEditor id={route.id} />}
       </main>
       <ShortcutsPanel />
+      <ToastContainer />
     </div>
   )
 }

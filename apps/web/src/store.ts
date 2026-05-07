@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Project } from '@galley/shared'
 import { api } from './lib/api'
+import { useToastStore } from './store/toasts'
 
 const MAX_HISTORY = 50
 
@@ -17,6 +18,12 @@ type SetLocalOptions = {
 type State = {
   project: Project | null
   loading: boolean
+  /**
+   * Last error message from `load` or `patch`. Retained for backwards
+   * compatibility with any caller that may read it; new UI surfaces should
+   * subscribe to the toast store instead, which is where failures are
+   * reported now.
+   */
   error: string | null
   pastStack: Project[]
   futureStack: Project[]
@@ -47,6 +54,10 @@ function isSameProject(a: Project | null, b: Project | null): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
+function toMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 export const useProjectStore = create<State>((set, get) => ({
   project: null,
   loading: false,
@@ -55,11 +66,16 @@ export const useProjectStore = create<State>((set, get) => ({
   futureStack: [],
   async load(id) {
     set({ loading: true, error: null, pastStack: [], futureStack: [] })
+    useToastStore.getState().beginInFlight()
     try {
       const project = await api.getProject(id)
       set({ project, loading: false })
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : String(err) })
+      const message = toMessage(err)
+      set({ loading: false, error: message })
+      useToastStore.getState().push('error', `Failed to load project: ${message}`)
+    } finally {
+      useToastStore.getState().endInFlight()
     }
   },
   async patch(patch) {
@@ -81,12 +97,14 @@ export const useProjectStore = create<State>((set, get) => ({
       set({ project: next })
     } catch (err) {
       // Roll back the optimistic state AND the snapshot we just pushed.
+      const message = toMessage(err)
       const past = get().pastStack
       set({
         project: current,
         pastStack: past.slice(0, -1),
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
       })
+      useToastStore.getState().push('error', `Failed to save changes: ${message}`)
     }
   },
   setLocal(project, options) {
@@ -119,7 +137,9 @@ export const useProjectStore = create<State>((set, get) => ({
     try {
       await api.updateProject(project.id, previous)
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) })
+      const message = toMessage(err)
+      set({ error: message })
+      useToastStore.getState().push('error', `Failed to undo: ${message}`)
     }
   },
   async redo() {
@@ -134,7 +154,9 @@ export const useProjectStore = create<State>((set, get) => ({
     try {
       await api.updateProject(project.id, next)
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) })
+      const message = toMessage(err)
+      set({ error: message })
+      useToastStore.getState().push('error', `Failed to redo: ${message}`)
     }
   },
   reset() {
