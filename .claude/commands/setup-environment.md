@@ -83,15 +83,27 @@ backlog-consistency pre-commit hook runs.
 
 ---
 
-## Step 7 — Set the Anthropic API key
+## Step 7 — Set the LLM API key
 
-Create `apps/api/.env`:
+Create `apps/api/.env` based on `apps/api/.env.example`. The default provider
+is **Google Gemini** (free tier via Google AI Studio):
 
 ```
+LLM_PROVIDER=google
+GOOGLE_GENERATIVE_AI_API_KEY=...
+```
+
+Get a free key at https://aistudio.google.com/app/apikey.
+
+To use Claude instead, set:
+
+```
+LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Without this key, the Q&A and layout generation endpoints will return 503.
+Without a key for the active provider, the Q&A and layout generation
+endpoints will return 503. See [ADR-006](../../decisions/ADR-006-provider-agnostic-llm-via-ai-sdk.md).
 
 ---
 
@@ -127,7 +139,7 @@ pnpm dev
 | `pnpm: command not found` | `volta install pnpm@9.15.0` again |
 | `pnpm install` fails (frozen lockfile) | `pnpm install --no-frozen-lockfile`, then commit the updated lockfile |
 | `better-sqlite3` build error | Ensure native build tools are installed (`xcode-select --install` on macOS, `build-essential` on Debian/Ubuntu, MSVC build tools on Windows) |
-| API returns 503 on `/api/projects/:id/qa/next` | `apps/api/.env` is missing `ANTHROPIC_API_KEY` |
+| API returns 503 on `/api/projects/:id/qa/next` | `apps/api/.env` is missing the API key for the active `LLM_PROVIDER` (`GOOGLE_GENERATIVE_AI_API_KEY` for `google`, `ANTHROPIC_API_KEY` for `anthropic`) |
 | Pre-commit hook not running | `git config core.hooksPath githooks` (or re-run `pnpm install`) |
 
 ---

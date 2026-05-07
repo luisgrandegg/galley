@@ -38,7 +38,7 @@ toward shipping the smallest thing that proves the loop end-to-end.
 | Styling | Tailwind CSS |
 | Backend | Node.js + TypeScript + Hono |
 | Database | SQLite via `better-sqlite3` (single `projects` table, JSON blob per project) |
-| LLM | Anthropic SDK (`@anthropic-ai/sdk`), Claude Sonnet 4, tool-calling for structured output |
+| LLM | Vercel AI SDK (`ai` + `@ai-sdk/google` / `@ai-sdk/anthropic`); default Google Gemini 2.5 Flash, pluggable to Claude Sonnet 4.5 via `LLM_PROVIDER`. Tool-calling + Zod for every structured output. |
 | Monorepo | pnpm workspaces + Turborepo |
 
 **Coordinate system.** All measurements in millimetres. Origin at top-left of the
@@ -53,7 +53,7 @@ is no conversion confusion. Convert px ↔ mm via `pxPerMm` only at render time.
 /
 ├── apps/
 │   ├── web/                  # Vite + React + Konva + Tailwind
-│   └── api/                  # Hono + SQLite + Anthropic SDK
+│   └── api/                  # Hono + SQLite + Vercel AI SDK (Gemini default)
 ├── packages/
 │   └── shared/               # Types, constants, validator (pure TS)
 │       ├── src/
@@ -95,6 +95,7 @@ LLM integration, or persistence, read the relevant ADR first.
 | [ADR-003](./decisions/ADR-003-sqlite-json-blob-per-project.md) | Persist each project as a single JSON blob in SQLite |
 | [ADR-004](./decisions/ADR-004-validator-first-llm-second.md) | Validator is the source of truth; the LLM repairs against it |
 | [ADR-005](./decisions/ADR-005-llm-tool-calling-with-zod.md) | All LLM outputs must come through tool calls and be Zod-validated |
+| [ADR-006](./decisions/ADR-006-provider-agnostic-llm-via-ai-sdk.md) | Provider-agnostic LLM via Vercel AI SDK; default Gemini 2.5 Flash |
 
 If you are about to make a decision that contradicts an existing ADR, stop and
 flag it explicitly. If the decision genuinely needs to change, write a new ADR
@@ -177,7 +178,12 @@ need tests.
 ## LLM Integration Rule
 
 - **Never call the LLM from the browser.** Always proxy through `apps/api`.
+- **The provider is selected at runtime** via `LLM_PROVIDER` (`google` default
+  | `anthropic`). Both call sites use the Vercel AI SDK's `generateText` with
+  Zod-defined `tool()` schemas — never import `@ai-sdk/google` or
+  `@ai-sdk/anthropic` directly outside `apps/api/src/llm/provider.ts`. See ADR-006.
 - **Every LLM tool-call response must be Zod-validated** before it is trusted.
+  Schemas live in `packages/shared/src/schemas.ts`.
 - **Stream Q&A responses** (one question at a time) for UX. Layout generation can
   be a single non-streamed call.
 - **Log every LLM request/response** to a local file in dev mode (`./llm-logs/`,

@@ -1,6 +1,7 @@
 import {
   CLEARANCES,
   LayoutToolSchema,
+  ModuleSchema,
   STANDARD_MODULES,
   WORK_TRIANGLE,
   type FixedPoint,
@@ -11,8 +12,9 @@ import {
   type Wall,
   validateLayout,
 } from '@galley/shared'
-import type Anthropic from '@anthropic-ai/sdk'
-import { MODEL, getAnthropicClient } from './anthropic.js'
+import { generateText, tool, type ModelMessage } from 'ai'
+import { z } from 'zod'
+import { getModel } from './provider.js'
 import { logLLMCall } from './log.js'
 
 // Layout generation per MVP.md + ADR-004:
@@ -24,54 +26,14 @@ import { logLLMCall } from './log.js'
 
 const MAX_REPAIRS = 3
 
-const TOOLS: Anthropic.Tool[] = [
-  {
-    name: 'propose_layout',
-    description:
-      'Propose a kitchen layout as a list of placed modules and a short rationale.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        modules: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              kind: {
-                type: 'string',
-                enum: [
-                  'base_cabinet',
-                  'wall_cabinet',
-                  'tall_cabinet',
-                  'sink_unit',
-                  'hob_unit',
-                  'oven_tower',
-                  'fridge',
-                  'dishwasher',
-                  'island',
-                ],
-              },
-              position: {
-                type: 'object',
-                properties: { x: { type: 'number' }, y: { type: 'number' } },
-                required: ['x', 'y'],
-              },
-              rotation: { type: 'integer', enum: [0, 90, 180, 270] },
-              width: { type: 'number' },
-              depth: { type: 'number' },
-              height: { type: 'number' },
-              label: { type: 'string' },
-            },
-            required: ['id', 'kind', 'position', 'rotation', 'width', 'depth', 'height'],
-          },
-        },
-        rationale: { type: 'string' },
-      },
-      required: ['modules', 'rationale'],
-    },
-  },
-]
+const proposeLayoutTool = tool({
+  description:
+    'Propose a kitchen layout as a list of placed modules and a short rationale.',
+  inputSchema: z.object({
+    modules: z.array(ModuleSchema),
+    rationale: z.string(),
+  }),
+})
 
 export type GenerateLayoutInput = {
   walls: Wall[]
@@ -130,15 +92,19 @@ ${JSON.stringify(input.preferences, null, 2)}
 Call propose_layout with a layout that satisfies every constraint above.`
 }
 
-function repairPrompt(violations: string[]): string {
+function repairInstruction(violations: string[]): string {
   return `The previous layout failed validation. Violations:\n\n${violations
     .map((v, i) => `${i + 1}. ${v}`)
-    .join('\n')}\n\nCall propose_layout again with a corrected layout that fixes ALL violations. Keep modules that were valid; move or resize the offending ones.`
+    .join(
+      '\n'
+    )}\n\nCall propose_layout again with a corrected layout that fixes ALL violations. Keep modules that were valid; move or resize the offending ones.`
 }
 
-export async function generateLayout(input: GenerateLayoutInput): Promise<GenerateLayoutResult> {
-  const client = getAnthropicClient()
-  const messages: Anthropic.MessageParam[] = [
+export async function generateLayout(
+  input: GenerateLayoutInput
+): Promise<GenerateLayoutResult> {
+  const model = getModel()
+  const messages: ModelMessage[] = [
     { role: 'user', content: userPromptInitial(input) },
   ]
   let layout: Layout | null = null
@@ -146,22 +112,24 @@ export async function generateLayout(input: GenerateLayoutInput): Promise<Genera
   let iteration = 0
 
   for (iteration = 0; iteration <= MAX_REPAIRS; iteration++) {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4096,
+    const result = await generateText({
+      model,
       system: systemPrompt(),
-      tools: TOOLS,
-      tool_choice: { type: 'tool', name: 'propose_layout' },
+      tools: { propose_layout: proposeLayoutTool },
+      toolChoice: { type: 'tool', toolName: 'propose_layout' },
       messages,
     })
 
-    logLLMCall(`layout-iter-${iteration}`, { request: messages, response })
+    logLLMCall(`layout-iter-${iteration}`, {
+      request: messages,
+      response: { toolCalls: result.toolCalls, finishReason: result.finishReason },
+    })
 
-    const tool = response.content.find((b) => b.type === 'tool_use')
-    if (!tool || tool.type !== 'tool_use' || tool.name !== 'propose_layout') {
+    const call = result.toolCalls[0]
+    if (!call || call.toolName !== 'propose_layout') {
       throw new Error('Layout: model did not call propose_layout')
     }
-    const parsed = LayoutToolSchema.parse(tool.input)
+    const parsed = LayoutToolSchema.parse(call.input)
     const modules: Module[] = parsed.modules
     layout = {
       modules,
@@ -177,21 +145,26 @@ export async function generateLayout(input: GenerateLayoutInput): Promise<Genera
     })
 
     if (validation.ok) break
-
     if (iteration === MAX_REPAIRS) break
 
+    const violationLines = validation.violations.map((v) => v.message)
     messages.push(
-      { role: 'assistant', content: response.content },
+      ...result.response.messages,
       {
-        role: 'user',
+        role: 'tool',
         content: [
           {
-            type: 'tool_result',
-            tool_use_id: tool.id,
-            content: repairPrompt(validation.violations.map((v) => v.message)),
+            type: 'tool-result',
+            toolCallId: call.toolCallId,
+            toolName: 'propose_layout',
+            output: {
+              type: 'text',
+              value: `Validator rejected the layout:\n${violationLines.join('\n')}`,
+            },
           },
         ],
-      }
+      },
+      { role: 'user', content: repairInstruction(violationLines) }
     )
   }
 

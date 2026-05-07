@@ -40,7 +40,7 @@ This is an MVP. Bias toward shipping the smallest thing that proves the loop wor
 - **Canvas:** [Konva.js](https://konvajs.org/) via `react-konva`. Strong React integration, handles drag/snap/rotation cleanly.
 - **State:** Zustand for global project state. Keep it boring.
 - **Backend:** Node.js + TypeScript using [Hono](https://hono.dev/). Single process. SQLite via `better-sqlite3` for project persistence. Local filesystem for blueprint images.
-- **LLM:** Anthropic SDK (`@anthropic-ai/sdk`), Claude Sonnet 4. Use tool/function calling for structured output. Never call the LLM from the browser — always proxy through the backend.
+- **LLM:** Vercel AI SDK (`ai`) wrapping a provider chosen at runtime via `LLM_PROVIDER`. Default is **Google Gemini 2.5 Flash** (`@ai-sdk/google`, free tier via Google AI Studio); fallback is **Claude Sonnet 4.5** (`@ai-sdk/anthropic`). Use tool/function calling for structured output. Never call the LLM from the browser — always proxy through the backend. See [ADR-006](./decisions/ADR-006-provider-agnostic-llm-via-ai-sdk.md).
 - **Styling:** Tailwind CSS.
 - **Package manager:** pnpm.
 - **Monorepo layout:** A single repo with `apps/web` and `apps/api`, plus `packages/shared` for types and constants shared between them. Use pnpm workspaces.
@@ -287,7 +287,7 @@ Suggested order. Each phase ends with something demoable.
 - Image upload, Konva canvas, wall tracing, scale setting, fixed-point placement, persistence.
 
 **Phase 3 — Q&A (1–2 days)**
-- Backend endpoint with Anthropic SDK and tool calling, frontend chat UI, preferences persisted.
+- Backend endpoint via the Vercel AI SDK (provider-agnostic, default Gemini) with tool calling, frontend chat UI, preferences persisted.
 
 **Phase 4 — Layout generation v1 (3–5 days)**
 - Validator first (pure TS, well-tested). Then generation endpoint, repair loop, render result on canvas.

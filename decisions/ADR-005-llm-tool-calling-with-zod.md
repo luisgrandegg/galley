@@ -26,8 +26,9 @@ anything.
    - `finalize(preferences: Preferences)`
    - `propose_layout(modules: Module[], rationale: string)`
 2. **Every tool response is parsed through a Zod schema** colocated in
-   `apps/api/src/llm/schemas.ts`. If parsing fails, we treat the call as a
-   transient error and retry once with the parse error fed back to the model.
+   `packages/shared/src/schemas.ts` (importable from both apps). If parsing
+   fails, we treat the call as a transient error and retry once with the parse
+   error fed back to the model.
 3. **Never call the LLM from the browser.** The frontend talks to
    `apps/api`; only `apps/api` holds the API key.
 4. **Log every LLM request and response** to `./llm-logs/<timestamp>.json` in
