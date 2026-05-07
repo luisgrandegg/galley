@@ -25,3 +25,15 @@ Let the user refine a generated layout by manipulating modules on the canvas.
 
 - Free rotation. 90° increments only in MVP.
 - Multi-select. Defer.
+
+---
+
+## Completion
+
+- **Completed:** 2026-05-07
+- **PR:** #TBD
+- **Commit:** 3548e396f60d853cb2e7a9491db931cae88b15c1
+- **Notes:** Drag/rotate/swap/delete and pure-TS snap helpers (30 mm to walls,
+  10 mm to modules) implemented in the layout view. Edits persist via debounced
+  `api.saveLayout`; the live validator already runs on every project change and
+  flags violating modules in the sidebar.
