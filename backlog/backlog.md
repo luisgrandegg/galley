@@ -14,8 +14,6 @@ Active features for galley. Check this before starting work.
 | F-009 | Scale-setting tool (two-point reference + mm input) | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-011 | Q&A wizard UI (chat-style with quick picks) | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
 | F-012 | Layout view + Generate button | Done — initial port | claude/port-ai-gallery-mvp-Jvafk |
-| F-013 | Module drag/rotate/swap/delete + snap helpers | Planned | — |
-| F-014 | PNG and JSON export | Planned | — |
 | F-015 | Undo/redo in-session stack | Planned | — |
 | F-016 | Loading states and error toasts | Planned | — |
 | F-017 | Keyboard shortcuts panel | Planned | — |
