@@ -1,15 +1,17 @@
 import {
   AskQuestionToolSchema,
   FinalizeToolSchema,
+  PreferencesSchema,
   type Preferences,
 } from '@galley/shared'
-import type Anthropic from '@anthropic-ai/sdk'
-import { MODEL, getAnthropicClient } from './anthropic.js'
+import { generateText, tool, type ModelMessage } from 'ai'
+import { z } from 'zod'
+import { getModel } from './provider.js'
 import { logLLMCall } from './log.js'
 
 // Q&A turn endpoint per MVP.md. The LLM gets the partial preferences and is
-// instructed to either ask the next question or finalise. We wire it via
-// tool-calling and Zod-validate the response (ADR-005).
+// instructed to either ask the next question or finalise. Tool-calling +
+// Zod-validated output (ADR-005); provider-agnostic via the AI SDK (ADR-006).
 
 export type QATurn =
   | { kind: 'question'; text: string; quickPicks?: string[] }
@@ -39,65 +41,21 @@ Preferences schema:
 - accessibility: array of free-form strings
 - notes: free text capturing anything else`
 
-const TOOLS: Anthropic.Tool[] = [
-  {
-    name: 'ask_question',
-    description: 'Ask the user the next question in the Q&A.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        text: { type: 'string', description: 'The question text in plain prose.' },
-        quickPicks: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional short options the user can click directly.',
-        },
-      },
-      required: ['text'],
-    },
-  },
-  {
-    name: 'finalize',
-    description: 'Finalise the preferences when the schema is fully populated.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        preferences: {
-          type: 'object',
-          properties: {
-            style: { type: 'string', enum: ['modern', 'classic', 'rustic', 'minimal', 'industrial'] },
-            budgetTier: { type: 'string', enum: ['low', 'mid', 'high'] },
-            cookingFrequency: { type: 'string', enum: ['rare', 'weekly', 'daily', 'intense'] },
-            hobType: { type: 'string', enum: ['induction', 'gas', 'ceramic'] },
-            ovenType: { type: 'string', enum: ['single', 'double', 'combi', 'none'] },
-            fridgeSize: { type: 'string', enum: ['compact', 'standard', 'american'] },
-            dishwasher: { type: 'boolean' },
-            islandPreferred: { type: 'boolean' },
-            seatingAtIsland: { type: 'integer', minimum: 0 },
-            storagePriority: { type: 'string', enum: ['low', 'medium', 'high'] },
-            accessibility: { type: 'array', items: { type: 'string' } },
-            notes: { type: 'string' },
-          },
-          required: [
-            'style',
-            'budgetTier',
-            'cookingFrequency',
-            'hobType',
-            'ovenType',
-            'fridgeSize',
-            'dishwasher',
-            'islandPreferred',
-            'seatingAtIsland',
-            'storagePriority',
-            'accessibility',
-            'notes',
-          ],
-        },
-      },
-      required: ['preferences'],
-    },
-  },
-]
+const askQuestionTool = tool({
+  description: 'Ask the user the next question in the Q&A.',
+  inputSchema: z.object({
+    text: z.string().min(1).describe('The question text in plain prose.'),
+    quickPicks: z
+      .array(z.string())
+      .optional()
+      .describe('Optional short options the user can click directly.'),
+  }),
+})
+
+const finalizeTool = tool({
+  description: 'Finalise the preferences when the schema is fully populated.',
+  inputSchema: z.object({ preferences: PreferencesSchema }),
+})
 
 export type QAMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -105,37 +63,40 @@ export async function nextQATurn(args: {
   partial: Record<string, unknown>
   history: QAMessage[]
 }): Promise<QATurn> {
-  const client = getAnthropicClient()
-  const userPrefix = `Partial preferences so far (JSON):\n${JSON.stringify(args.partial, null, 2)}\n\nDecide whether to ask the next question or finalise.`
+  const userPrefix = `Partial preferences so far (JSON):\n${JSON.stringify(
+    args.partial,
+    null,
+    2
+  )}\n\nDecide whether to ask the next question or finalise.`
 
-  const messages: Anthropic.MessageParam[] = [
-    ...args.history.map((m) => ({ role: m.role, content: m.content })),
+  const messages: ModelMessage[] = [
+    ...args.history.map((m) => ({ role: m.role, content: m.content }) as ModelMessage),
     { role: 'user', content: userPrefix },
   ]
 
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1024,
+  const result = await generateText({
+    model: getModel(),
     system: SYSTEM_PROMPT,
-    tools: TOOLS,
-    tool_choice: { type: 'any' },
+    tools: { ask_question: askQuestionTool, finalize: finalizeTool },
+    toolChoice: 'required',
     messages,
   })
 
-  logLLMCall('qa', { request: { messages, partial: args.partial }, response })
+  logLLMCall('qa', {
+    request: { messages, partial: args.partial },
+    response: { toolCalls: result.toolCalls, finishReason: result.finishReason },
+  })
 
-  const tool = response.content.find((b) => b.type === 'tool_use')
-  if (!tool || tool.type !== 'tool_use') {
-    throw new Error('Q&A: model did not call a tool')
-  }
+  const call = result.toolCalls[0]
+  if (!call) throw new Error('Q&A: model did not call a tool')
 
-  if (tool.name === 'ask_question') {
-    const parsed = AskQuestionToolSchema.parse(tool.input)
+  if (call.toolName === 'ask_question') {
+    const parsed = AskQuestionToolSchema.parse(call.input)
     return { kind: 'question', text: parsed.text, quickPicks: parsed.quickPicks }
   }
-  if (tool.name === 'finalize') {
-    const parsed = FinalizeToolSchema.parse(tool.input)
+  if (call.toolName === 'finalize') {
+    const parsed = FinalizeToolSchema.parse(call.input)
     return { kind: 'final', preferences: parsed.preferences }
   }
-  throw new Error(`Q&A: unexpected tool ${tool.name}`)
+  throw new Error(`Q&A: unexpected tool ${call.toolName}`)
 }

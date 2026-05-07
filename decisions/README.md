@@ -67,6 +67,7 @@ What new constraints does it create?
 | [ADR-003](./ADR-003-sqlite-json-blob-per-project.md) | SQLite with one JSON blob per project | Accepted |
 | [ADR-004](./ADR-004-validator-first-llm-second.md) | Validator first; LLM repairs against it | Accepted |
 | [ADR-005](./ADR-005-llm-tool-calling-with-zod.md) | LLM tool-calling, Zod-validated outputs | Accepted |
+| [ADR-006](./ADR-006-provider-agnostic-llm-via-ai-sdk.md) | Provider-agnostic LLM via Vercel AI SDK; default Gemini 2.5 Flash | Accepted |
 
 ---
 

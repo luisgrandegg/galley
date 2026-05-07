@@ -22,6 +22,7 @@ import {
 } from './db.js'
 import { nextQATurn, type QAMessage } from './llm/qa.js'
 import { generateLayout } from './llm/layout.js'
+import { MissingApiKeyError } from './llm/provider.js'
 
 const UPLOADS = process.env.GALLEY_UPLOADS ?? 'uploads'
 mkdirSync(UPLOADS, { recursive: true })
@@ -203,10 +204,10 @@ app.post('/api/projects/:id/qa/next', async (c) => {
     }
     return c.json({ data: turn })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown'
-    if (message.includes('ANTHROPIC_API_KEY')) {
-      return c.json({ error: { code: 'no_api_key', message } }, 503)
+    if (err instanceof MissingApiKeyError) {
+      return c.json({ error: { code: 'no_api_key', message: err.message } }, 503)
     }
+    const message = err instanceof Error ? err.message : 'unknown'
     return c.json({ error: { code: 'llm_error', message } }, 500)
   }
 })
@@ -244,10 +245,10 @@ app.post('/api/projects/:id/layout/generate', async (c) => {
       },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown'
-    if (message.includes('ANTHROPIC_API_KEY')) {
-      return c.json({ error: { code: 'no_api_key', message } }, 503)
+    if (err instanceof MissingApiKeyError) {
+      return c.json({ error: { code: 'no_api_key', message: err.message } }, 503)
     }
+    const message = err instanceof Error ? err.message : 'unknown'
     return c.json({ error: { code: 'llm_error', message } }, 500)
   }
 })
